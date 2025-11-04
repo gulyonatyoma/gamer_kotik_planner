@@ -1,0 +1,57 @@
+<!-- templates/calendar.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Календарь</title>
+    <link rel="icon" href="data:image/svg+xml,...">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-title"><h1>Календарь</h1><p>{{ current_month_date.strftime('%B %Y') }}</p></div>
+            <nav class="main-nav">
+                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}">Дашборд</a>
+                <a href="{{ url_for('projects_page') }}" class="{{ 'active' if 'project' in request.endpoint else '' }}">Проекты</a>
+                <a href="{{ url_for('calendar_page') }}" class="{{ 'active' if request.endpoint == 'calendar_page' else '' }}">Календарь</a>
+                <a href="{{ url_for('review_page') }}" class="{{ 'active' if request.endpoint == 'review_page' else '' }}">Ревью</a>
+                <a href="{{ url_for('analytics_page') }}" class="{{ 'active' if request.endpoint == 'analytics_page' else '' }}">Аналитика</a>
+                <a href="{{ url_for('archive_page') }}" class="{{ 'active' if request.endpoint == 'archive_page' else '' }}">Архив</a>
+            </nav>
+        </header>
+
+        <div class="card">
+            <div class="calendar-header">
+                <a href="{{ url_for('calendar_page', year=nav.prev.year, month=nav.prev.month) }}" class="nav-arrow">‹</a>
+                <h2>{{ current_month_date.strftime('%B %Y') }}</h2>
+                <a href="{{ url_for('calendar_page', year=nav.next.year, month=nav.next.month) }}" class="nav-arrow">›</a>
+            </div>
+            <div class="calendar-grid">
+                <div class="day-name">Пн</div><div class="day-name">Вт</div><div class="day-name">Ср</div>
+                <div class="day-name">Чт</div><div class="day-name">Пт</div><div class="day-name">Сб</div>
+                <div class="day-name">Вс</div>
+                
+                {% for week in month_days %}
+                    {% for day in week %}
+                        {% set is_today = day == today %}
+                        {% set is_other_month = day.month != current_month_date.month %}
+                        <div class="day-cell {% if is_today %}today{% endif %} {% if is_other_month %}other-month{% endif %}">
+                            <div class="day-number">{{ day.day }}</div>
+                            
+                            {# --- ИСПРАВЛЕНИЕ ЗДЕСЬ --- #}
+                            {% if day.isoformat() in tasks_by_date %}
+                                <ul class="calendar-task-list">
+                                {% for task in tasks_by_date[day.isoformat()] %}
+                                    <li class="cal-task {% if task.status == 'completed' %}completed{% endif %}" title="{{ task.title }}">{{ task.title }}</li>
+                                {% endfor %}
+                                </ul>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</body>
+</html>

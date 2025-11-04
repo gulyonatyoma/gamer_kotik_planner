@@ -1,0 +1,41 @@
+<!-- templates/projects.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Проекты</title>
+    <link rel="icon" href="data:image/svg+xml,...">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-title"><h1>Проектный Офис</h1><p>Обзор всех ваших крупных целей</p></div>
+            <nav class="main-nav">
+                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}"><span>🏠</span> Дашборд</a>
+                <a href="{{ url_for('projects_page') }}" class="{{ 'active' if 'project' in request.endpoint else '' }}"><span>📂</span> Проекты</a>
+                <a href="{{ url_for('calendar_page') }}" class="{{ 'active' if request.endpoint == 'calendar_page' else '' }}"><span>🗓️</span> Календарь</a>
+                <a href="{{ url_for('review_page') }}" class="{{ 'active' if request.endpoint == 'review_page' else '' }}"><span>📊</span> Ревью</a>
+                <a href="{{ url_for('analytics_page') }}" class="{{ 'active' if request.endpoint == 'analytics_page' else '' }}"><span>📈</span> Аналитика</a>
+                <a href="{{ url_for('archive_page') }}" class="{{ 'active' if request.endpoint == 'archive_page' else '' }}"><span>🗄️</span> Архив</a>
+            </nav>
+        </header>
+        <div class="card add-task-card">
+            <h2>Создать новый проект</h2>
+            <form action="{{ url_for('add_project') }}" method="post" class="add-form">
+                <input type="text" name="project_name" placeholder="Название нового проекта..." required>
+                <button type="submit">Создать</button>
+            </form>
+        </div>
+        <div class="projects-grid">
+            {% for project in projects %}
+            <div class="card project-card">
+                <h2><a href="{{ url_for('project_detail_page', project_name=project.name) }}">{{ project.name }}</a></h2>
+                <div class="progress-bar-container"><div class="progress-bar" style="width: {{ project.progress | default(0) }}%;"></div></div>
+                <p class="project-stats">Выполнено {{ project.completed }} из {{ project.total }} ({{ project.progress }}%)</p>
+            </div>
+            {% else %}<p>У вас еще нет проектов. Создайте первый!</p>{% endfor %}
+        </div>
+    </div>
+</body>
+</html>

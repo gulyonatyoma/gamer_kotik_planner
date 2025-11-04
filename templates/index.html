@@ -1,0 +1,67 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Командный Центр</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎯</text></svg>">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-title"><h1>Командный Центр</h1><p>{{ "now"|format_datetime }}</p></div>
+            <nav class="main-nav">
+                <a href="{{ url_for('index') }}" class="active"><span>🏠</span> Дашборд</a>
+                <a href="{{ url_for('projects_page') }}"><span>📂</span> Проекты</a>
+                <a href="{{ url_for('calendar_page') }}"><span>🗓️</span> Календарь</a>
+                <a href="{{ url_for('review_page') }}"><span>📊</span> Ревью</a>
+                <a href="{{ url_for('analytics_page') }}"><span>📈</span> Аналитика</a>
+                <a href="{{ url_for('archive_page') }}"><span>🗄️</span> Архив</a>
+            </nav>
+        </header>
+
+        <div class="main-grid-dashboard">
+            <div class="card">
+                <h2>🎯 ПЛАН НА СЕГОДНЯ</h2>
+                <ul class="task-list">
+                    {% for task in today_tasks %}
+                    <li class="priority-{{ task.priority or 'low' }} {% if task.deadline and task.deadline < today_date %}overdue{% endif %}">
+                        <div class="task-info"><span class="task-title">{{ task.title }}</span>{% if task.deadline %}<span class="task-deadline">📅 {{ task.deadline }}</span>{% endif %}</div>
+                        <div class="actions">
+                            <form action="{{ url_for('set_priority', task_id=task.id) }}" method="post"><button title="Приоритет" class="btn-prioritize">🔥</button></form>
+                            <form action="{{ url_for('complete_task', task_id=task.id) }}" method="post"><button title="Завершить" class="btn-complete">✓</button></form>
+                            <form action="{{ url_for('delete_task', task_id=task.id) }}" method="post"><button title="Удалить" class="btn-delete">🗑️</button></form>
+                        </div>
+                    </li>
+                    {% else %}<li>На сегодня ничего не запланировано.</li>{% endfor %}
+                </ul>
+                <form action="{{ url_for('add_task') }}" method="post" class="add-form">
+                    <input type="text" name="title" placeholder="Добавить в план..." list="task_titles" required>
+                    <input type="date" name="deadline" title="Установить дедлайн">
+                    <button type="submit">+</button>
+                </form>
+            </div>
+
+            <div class="card">
+                <h2>✍️ ЖУРНАЛ АКТИВНОСТИ</h2>
+                <p class="card-subtitle">Записать работу, которой не было в плане</p>
+                <form action="{{ url_for('log_activity') }}" method="post" class="log-form">
+                    <input type="text" name="description" placeholder="Чем занимались?" list="task_titles" required>
+                    <input type="text" name="project" placeholder="#проект (необязательно)" list="project_names">
+                    <input type="number" name="duration" step="0.1" placeholder="Часы" required>
+                    <button type="submit">Записать</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Списки для автодополнения -->
+    <datalist id="task_titles">
+        {% for title in all_task_titles %}<option value="{{ title }}">{% endfor %}
+    </datalist>
+    <datalist id="project_names">
+        {% for project in all_projects %}<option value="{{ project }}">{% endfor %}
+    </datalist>
+</body>
+</html>

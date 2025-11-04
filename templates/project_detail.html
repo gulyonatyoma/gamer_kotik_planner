@@ -1,0 +1,45 @@
+<!-- templates/project_detail.html -->
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Проект: {{ project_name }}</title>
+    <link rel="icon" href="data:image/svg+xml,...">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <div class="container">
+        <header class="main-header">
+            <div class="header-title"><h1>Проект: {{ project_name }}</h1><p>Все задачи для достижения этой цели</p></div>
+             <nav class="main-nav">
+                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}"><span>🏠</span> Дашборд</a>
+                <a href="{{ url_for('projects_page') }}" class="{{ 'active' if 'project' in request.endpoint else '' }}"><span>📂</span> Проекты</a>
+                <a href="{{ url_for('calendar_page') }}" class="{{ 'active' if request.endpoint == 'calendar_page' else '' }}"><span>🗓️</span> Календарь</a>
+                <a href="{{ url_for('review_page') }}" class="{{ 'active' if request.endpoint == 'review_page' else '' }}"><span>📊</span> Ревью</a>
+                <a href="{{ url_for('analytics_page') }}" class="{{ 'active' if request.endpoint == 'analytics_page' else '' }}"><span>📈</span> Аналитика</a>
+                <a href="{{ url_for('archive_page') }}" class="{{ 'active' if request.endpoint == 'archive_page' else '' }}"><span>🗄️</span> Архив</a>
+            </nav>
+        </header>
+        <div class="card" style="grid-column: 1 / -1;">
+            <h2>Задачи проекта</h2>
+            <ul class="task-list">
+                {% for task in tasks %}
+                <li class="{% if task.deadline and task.deadline < today_date %}overdue{% endif %}">
+                    <div class="task-info"><span class="task-title">{{ task.title }}</span>{% if task.deadline %}<span class="task-deadline">📅 {{ task.deadline }}</span>{% endif %}</div>
+                    <div class="actions">
+                        <form action="{{ url_for('move_to_today', task_id=task.id) }}" method="post"><button title="В план на сегодня" class="btn-to-today">➤</button></form>
+                        <form action="{{ url_for('complete_task', task_id=task.id) }}" method="post"><button title="Завершить" class="btn-complete">✓</button></form>
+                        <form action="{{ url_for('delete_task', task_id=task.id) }}" method="post"><button title="Удалить" class="btn-delete">🗑️</button></form>
+                    </div>
+                </li>
+                {% else %}<li>Все задачи по проекту выполнены или распланированы!</li>{% endfor %}
+            </ul>
+             <form action="{{ url_for('add_task_to_project', project_name=project_name) }}" method="post" class="add-form">
+                <input type="text" name="title" placeholder="Новая задача для проекта..." required>
+                <input type="date" name="deadline" title="Установить дедлайн">
+                <button type="submit">+</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

@@ -1,0 +1,50 @@
+[
+    {
+        "id": "57e6ab53-cb1c-455c-9a04-1a92eea1d429",
+        "title": "Начать работу над проектом",
+        "status": "pending",
+        "created_at": "2025-11-04T03:19:01.331985",
+        "completed_at": null,
+        "project": "Планнер с Альбертом",
+        "is_today": false,
+        "scheduled_for": null,
+        "priority": "low",
+        "deadline": null
+    },
+    {
+        "id": "04e32638-dbbf-45be-a954-7c921910e155",
+        "title": "Убраться в комнате",
+        "status": "pending",
+        "created_at": "2025-11-04T03:55:17.400749",
+        "completed_at": null,
+        "project": null,
+        "is_today": false,
+        "scheduled_for": null,
+        "priority": "low",
+        "deadline": null
+    },
+    {
+        "id": "723dee62-b236-4143-8e3a-8e4dbc31a476",
+        "title": "Убраться в комнате",
+        "status": "pending",
+        "created_at": "2025-11-04T03:55:31.424834",
+        "completed_at": null,
+        "project": null,
+        "is_today": false,
+        "scheduled_for": null,
+        "priority": "low",
+        "deadline": null
+    },
+    {
+        "id": "0b7c06d8-dccb-4080-92ad-10a31f7ef606",
+        "title": "Сделать ТФКП",
+        "status": "pending",
+        "created_at": "2025-11-04T06:22:05.670982",
+        "completed_at": null,
+        "project": null,
+        "is_today": false,
+        "scheduled_for": null,
+        "priority": "low",
+        "deadline": null
+    }
+]
