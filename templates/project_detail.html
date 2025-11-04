@@ -3,21 +3,21 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <title>Проект: {{ project_name }}</title>
+    <title>Проект: {{ project.name }}</title>
     <link rel="icon" href="data:image/svg+xml,...">
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
     <div class="container">
         <header class="main-header">
-            <div class="header-title"><h1>Проект: {{ project_name }}</h1><p>Все задачи для достижения этой цели</p></div>
+            <div class="header-title"><h1>Проект: {{ project.name }}</h1><p>Все задачи для достижения этой цели</p></div>
              <nav class="main-nav">
-                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}"><span>🏠</span> Дашборд</a>
-                <a href="{{ url_for('projects_page') }}" class="{{ 'active' if 'project' in request.endpoint else '' }}"><span>📂</span> Проекты</a>
-                <a href="{{ url_for('calendar_page') }}" class="{{ 'active' if request.endpoint == 'calendar_page' else '' }}"><span>🗓️</span> Календарь</a>
-                <a href="{{ url_for('review_page') }}" class="{{ 'active' if request.endpoint == 'review_page' else '' }}"><span>📊</span> Ревью</a>
-                <a href="{{ url_for('analytics_page') }}" class="{{ 'active' if request.endpoint == 'analytics_page' else '' }}"><span>📈</span> Аналитика</a>
-                <a href="{{ url_for('archive_page') }}" class="{{ 'active' if request.endpoint == 'archive_page' else '' }}"><span>🗄️</span> Архив</a>
+                <a href="{{ url_for('index') }}"><span>🏠</span> Дашборд</a>
+                <a href="{{ url_for('projects_page') }}" class="active"><span>📂</span> Проекты</a>
+                <a href="{{ url_for('calendar_page') }}"><span>🗓️</span> Календарь</a>
+                <a href="{{ url_for('review_page') }}"><span>📊</span> Ревью</a>
+                <a href="{{ url_for('analytics_page') }}"><span>📈</span> Аналитика</a>
+                <a href="{{ url_for('archive_page') }}"><span>🗄️</span> Архив</a>
             </nav>
         </header>
         <div class="card" style="grid-column: 1 / -1;">
@@ -34,7 +34,7 @@
                 </li>
                 {% else %}<li>Все задачи по проекту выполнены или распланированы!</li>{% endfor %}
             </ul>
-             <form action="{{ url_for('add_task_to_project', project_name=project_name) }}" method="post" class="add-form">
+             <form action="{{ url_for('add_task_to_project', project_name=project.name) }}" method="post" class="add-form">
                 <input type="text" name="title" placeholder="Новая задача для проекта..." required>
                 <input type="date" name="deadline" title="Установить дедлайн">
                 <button type="submit">+</button>

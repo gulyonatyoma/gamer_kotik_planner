@@ -12,12 +12,12 @@
         <header class="main-header">
             <div class="header-title"><h1>Архив</h1><p>Все ваши завершенные задачи</p></div>
             <nav class="main-nav">
-                <a href="{{ url_for('index') }}" class="{{ 'active' if request.endpoint == 'index' else '' }}"><span>🏠</span> Дашборд</a>
-                <a href="{{ url_for('projects_page') }}" class="{{ 'active' if 'project' in request.endpoint else '' }}"><span>📂</span> Проекты</a>
-                <a href="{{ url_for('calendar_page') }}" class="{{ 'active' if request.endpoint == 'calendar_page' else '' }}"><span>🗓️</span> Календарь</a>
-                <a href="{{ url_for('review_page') }}" class="{{ 'active' if request.endpoint == 'review_page' else '' }}"><span>📊</span> Ревью</a>
-                <a href="{{ url_for('analytics_page') }}" class="{{ 'active' if request.endpoint == 'analytics_page' else '' }}"><span>📈</span> Аналитика</a>
-                <a href="{{ url_for('archive_page') }}" class="{{ 'active' if request.endpoint == 'archive_page' else '' }}"><span>🗄️</span> Архив</a>
+                <a href="{{ url_for('index') }}"><span>🏠</span> Дашборд</a>
+                <a href="{{ url_for('projects_page') }}"><span>📂</span> Проекты</a>
+                <a href="{{ url_for('calendar_page') }}"><span>🗓️</span> Календарь</a>
+                <a href="{{ url_for('review_page') }}"><span>📊</span> Ревью</a>
+                <a href="{{ url_for('analytics_page') }}"><span>📈</span> Аналитика</a>
+                <a href="{{ url_for('archive_page') }}" class="active"><span>🗄️</span> Архив</a>
             </nav>
         </header>
         <div class="card">
@@ -26,7 +26,10 @@
                 {% for task in tasks %}
                 <li class="completed-task">
                     <div class="task-info">
-                        <span class="task-title">{% if task.project %}<strong>{{ task.project }}:</strong>{% endif %} {{ task.title }}</span>
+                        <span class="task-title">
+                            {# --- ИЗМЕНЕНИЕ ЗДЕСЬ: Используем task.project.name --- #}
+                            {% if task.project %}<strong>{{ task.project.name }}:</strong>{% endif %} {{ task.title }}
+                        </span>
                         <span class="task-deadline">✓ Завершено: {{ task.completed_at | format_datetime('%d.%m.%Y %H:%M') }}</span>
                     </div>
                     <div class="actions">

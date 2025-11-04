@@ -1,152 +1,214 @@
 # bot.py
 import logging
 import os
-from datetime import datetime
 import re
-
-from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
-
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import (
+    Application,
+    CommandHandler,
+    ContextTypes,
+    ConversationHandler,
+    CallbackQueryHandler,
+    MessageHandler,
+    filters,
+)
 from sqlalchemy import func
 
-# --- 1. НАСТРОЙКА ПОДКЛЮЧЕНИЯ К БАЗЕ ДАННЫХ ---
-app = Flask(__name__)
-DB_PASSWORD = os.environ.get('DB_PASSWORD', 'Yfnfif1999!')
-DB_URI = f"postgresql://planner_user:{DB_PASSWORD}@localhost:5432/planner_db"
-app.config['SQLALCHEMY_DATABASE_URI'] = DB_URI
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-db = SQLAlchemy(app)
+# --- 1. ИМПОРТ ИЗ НАШЕГО ФАЙЛА DATABASE.PY ---
+from database import SessionLocal, Project, Task
 
-# --- 2. МОДЕЛИ (Идентичны app.py) ---
-class Project(db.Model):
-    __tablename__ = 'projects'
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(255), unique=True, nullable=False)
-    tasks = db.relationship('Task', backref='project', lazy=True, cascade="all, delete-orphan")
-
-class Task(db.Model):
-    __tablename__ = 'tasks'
-    id = db.Column(db.Integer, primary_key=True)
-    title = db.Column(db.Text, nullable=False)
-    status = db.Column(db.String(50), default='pending')
-    is_today = db.Column(db.Boolean, default=False)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True)
-    created_at = db.Column(db.DateTime(timezone=True), server_default=func.now())
-
-# --- 3. КОНФИГУРАЦИЯ БОТА ---
-BOT_TOKEN = "8596801086:AAEBJTSqz_ivunraaThugqtta7DP_0410wU"
+# --- 2. КОНФИГУРАЦИЯ БОТА ---
+BOT_TOKEN = os.environ.get('BOT_TOKEN')
 logging.basicConfig(format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO)
 
-# --- 4. РЕАЛИЗАЦИЯ КОМАНД ---
+# --- 3. НОВИНКА: Определяем состояния для нашего диалога ---
+# Это как "шаги" в нашем разговоре с пользователем
+GET_TITLE, CHOOSE_PROJECT = range(2)
+
+
+# --- 4. ОБЫЧНЫЕ КОМАНДЫ (почти без изменений) ---
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     user = update.effective_user
-    await update.message.reply_html(f"Привет, {user.first_name}! Ассистент готов к работе.")
+    await update.message.reply_html(f"Привет, {user.first_name}! Ассистент готов к работе.\n\n"
+                                    "<b>Новые команды:</b>\n"
+                                    "/newtask - создать задачу в диалоге\n"
+                                    "/deletetask - удалить задачу")
 
 async def today_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    with app.app_context():
-        tasks = Task.query.filter_by(status='pending', is_today=True).order_by(Task.created_at).all()
-    if not tasks: await update.message.reply_text("🎯 План на сегодня пуст!"); return
-    message = "<b>🎯 План на сегодня:</b>\n\n" + "\n".join([f"• {task.title}" for task in tasks])
-    await update.message.reply_html(message)
-
-async def inbox_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    with app.app_context():
-        tasks = Task.query.filter_by(status='pending', is_today=False, project_id=None).order_by(Task.created_at).all()
-    if not tasks: await update.message.reply_text("📥 \"Входящие\" пусты."); return
-    message = "<b>📥 Задачи во 'Входящих':</b>\n\n" + "\n".join([f"• {task.title}" for task in tasks])
-    await update.message.reply_html(message)
+    session = SessionLocal()
+    try:
+        tasks = session.query(Task).filter_by(status='pending', is_today=True).order_by(Task.created_at).all()
+        if not tasks:
+            await update.message.reply_text("🎯 План на сегодня пуст!")
+            return
+        message = "<b>🎯 План на сегодня:</b>\n\n" + "\n".join([f"• {task.title}" for task in tasks])
+        await update.message.reply_html(message)
+    finally:
+        session.close()
 
 async def projects_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    with app.app_context():
-        projects = Project.query.order_by(Project.name).all()
-    if not projects: await update.message.reply_text("📂 У вас пока нет проектов."); return
-    message = "<b>📂 Ваши проекты:</b>\n\n" + "\n".join([f"• {proj.name}" for proj in projects])
-    await update.message.reply_html(message)
-
-async def add_task(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    task_text = ' '.join(context.args)
-    if not task_text:
-        await update.message.reply_text("Использование: /add [текст задачи] #проект (необязательно)")
-        return
-
-    project_name = None
-    match = re.search(r'#(\S+)', task_text)
-    if match:
-        project_name = match.group(1)
-        task_title = re.sub(r'\s*#\S+\s*', '', task_text).strip()
-    else:
-        task_title = task_text.strip()
-    
-    with app.app_context():
-        project_id = None
-        if project_name:
-            project = Project.query.filter(func.lower(Project.name) == func.lower(project_name)).first()
-            if project: project_id = project.id
-        
-        # --- ИЗМЕНЕНИЕ: Задачи без проекта теперь попадают в "План на сегодня" ---
-        new_task = Task(title=task_title, project_id=project_id, is_today=(not project_id))
-        db.session.add(new_task)
-        db.session.commit()
-        
-    response = f"✅ Задача '{task_title}' добавлена"
-    if project_name: response += f" в проект '{project_name}'."
-    else: response += " в 'План на сегодня'."
-    await update.message.reply_text(response)
-
-### НОВЫЕ КОМАНДЫ ДЛЯ УПРАВЛЕНИЯ ПРОЕКТАМИ ###
-async def add_project_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    project_name = ' '.join(context.args)
-    if not project_name:
-        await update.message.reply_text("Использование: /add_project [название проекта]")
-        return
-    
-    with app.app_context():
-        existing = Project.query.filter(func.lower(Project.name) == func.lower(project_name)).first()
-        if existing:
-            await update.message.reply_text(f"❗️ Проект '{project_name}' уже существует.")
+    session = SessionLocal()
+    try:
+        projects = session.query(Project).order_by(Project.name).all()
+        if not projects:
+            await update.message.reply_text("📂 У вас пока нет проектов.")
             return
-        
-        new_project = Project(name=project_name)
-        db.session.add(new_project)
-        db.session.add(Task(title="Начать работу над проектом", project=new_project))
-        db.session.commit()
+        message = "<b>📂 Ваши проекты:</b>\n\n" + "\n".join([f"• {proj.name}" for proj in projects])
+        await update.message.reply_html(message)
+    finally:
+        session.close()
+
+
+# --- 5. НОВЫЙ ДИАЛОГ ДЛЯ СОЗДАНИЯ ЗАДАЧИ ---
+
+# Шаг 1: Пользователь отправляет /newtask
+async def new_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    await update.message.reply_text("Отлично! Введите название новой задачи. (Для отмены введите /cancel)")
+    return GET_TITLE # Переходим на следующий шаг - ожидание названия
+
+# Шаг 2: Пользователь вводит название, бот предлагает проекты
+async def get_title(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    task_title = update.message.text
+    context.user_data['task_title'] = task_title # Временно сохраняем название
     
-    await update.message.reply_text(f"✅ Проект '{project_name}' успешно создан.")
+    session = SessionLocal()
+    try:
+        projects = session.query(Project).order_by(Project.name).all()
+    finally:
+        session.close()
 
-async def delete_project_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    project_name = ' '.join(context.args)
-    if not project_name:
-        await update.message.reply_text("Использование: /delete_project [точное название проекта]")
-        return
+    keyboard = [
+        # Первая кнопка - всегда добавить в "План на сегодня" (без проекта)
+        [InlineKeyboardButton("🎯 В План на сегодня", callback_data='select_project:today')],
+    ]
+    # Добавляем кнопки для каждого проекта
+    for proj in projects:
+        keyboard.append([InlineKeyboardButton(f"📂 {proj.name}", callback_data=f'select_project:{proj.id}')])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text(f"Задача: '{task_title}'\n\nКуда ее добавить?", reply_markup=reply_markup)
+    
+    return CHOOSE_PROJECT # Переходим на шаг ожидания нажатия кнопки
+
+# Шаг 3 (обработчик кнопок): Пользователь нажимает кнопку, задача создается
+async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    query = update.callback_query
+    await query.answer() # Обязательно "отвечаем" на нажатие
+
+    # Разбираем данные с кнопки, например "select_project:123"
+    action, value = query.data.split(':')
+    
+    task_title = context.user_data.get('task_title')
+    if not task_title:
+        await query.edit_message_text(text="Произошла ошибка, попробуйте снова /newtask")
+        return ConversationHandler.END
+
+    session = SessionLocal()
+    try:
+        if value == 'today': # Если нажали "В План на сегодня"
+            new_task = Task(title=task_title, project_id=None, is_today=True)
+            session.add(new_task)
+            session.commit()
+            await query.edit_message_text(text=f"✅ Задача '{task_title}' добавлена в 'План на сегодня'.")
+        else: # Если выбрали конкретный проект
+            project_id = int(value)
+            project = session.query(Project).get(project_id)
+            if project:
+                new_task = Task(title=task_title, project_id=project.id, is_today=False)
+                session.add(new_task)
+                session.commit()
+                await query.edit_message_text(text=f"✅ Задача '{task_title}' добавлена в проект '{project.name}'.")
+            else:
+                await query.edit_message_text(text="Ошибка: проект не найден.")
+    finally:
+        session.close()
+
+    context.user_data.clear() # Очищаем временные данные
+    return ConversationHandler.END # Завершаем диалог
+
+# Шаг 4 (отмена): Пользователь вводит /cancel
+async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    context.user_data.clear()
+    await update.message.reply_text("Действие отменено.")
+    return ConversationHandler.END
+
+
+# --- 6. НОВАЯ ФУНКЦИЯ ИНТЕРАКТИВНОГО УДАЛЕНИЯ ---
+
+# Пользователь отправляет /deletetask
+async def delete_task_start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    session = SessionLocal()
+    try:
+        # Собираем задачи из "Плана на сегодня" и "Входящих"
+        tasks_today = session.query(Task).filter_by(status='pending', is_today=True).all()
+        tasks_inbox = session.query(Task).filter_by(status='pending', is_today=False, project_id=None).all()
         
-    with app.app_context():
-        project = Project.query.filter(func.lower(Project.name) == func.lower(project_name)).first()
-        if not project:
-            await update.message.reply_text(f"❗️ Проект '{project_name}' не найден.")
+        all_tasks = tasks_today + tasks_inbox
+        
+        if not all_tasks:
+            await update.message.reply_text("Нет задач для удаления в 'Плане на сегодня' или 'Входящих'.")
             return
-            
-        db.session.delete(project)
-        db.session.commit()
-        
-    await update.message.reply_text(f"🗑️ Проект '{project_name}' и все связанные с ним задачи удалены.")
 
-# --- 5. ГЛАВНАЯ ФУНКЦИЯ ---
+        keyboard = []
+        for task in all_tasks:
+            # Для каждой задачи создаем кнопку с callback_data вида "delete_task:123"
+            button = InlineKeyboardButton(f"🗑️ {task.title}", callback_data=f'delete_task:{task.id}')
+            keyboard.append([button])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text("Какую задачу вы хотите удалить?", reply_markup=reply_markup)
+    finally:
+        session.close()
+
+# Пользователь нажимает на кнопку "Удалить"
+async def delete_task_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    query = update.callback_query
+    await query.answer()
+
+    action, task_id_str = query.data.split(':')
+    task_id = int(task_id_str)
+    
+    session = SessionLocal()
+    try:
+        task = session.query(Task).get(task_id)
+        if task:
+            task_title = task.title
+            session.delete(task)
+            session.commit()
+            await query.edit_message_text(text=f"✅ Задача '{task_title}' удалена.")
+        else:
+            await query.edit_message_text(text="Задача уже была удалена.")
+    finally:
+        session.close()
+
+
+# --- 7. ГЛАВНАЯ ФУНКЦИЯ С НОВЫМИ ОБРАБОТЧИКАМИ ---
 def main() -> None:
     application = Application.builder().token(BOT_TOKEN).build()
 
+    # Создаем ConversationHandler для диалога добавления задачи
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("newtask", new_task_start)],
+        states={
+            GET_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, get_title)],
+            CHOOSE_PROJECT: [CallbackQueryHandler(button_handler, pattern='^select_project:.*')],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    )
+
+    application.add_handler(conv_handler)
+
+    # Добавляем обычные команды
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("today", today_command))
-    application.add_handler(CommandHandler("inbox", inbox_command))
     application.add_handler(CommandHandler("projects", projects_command))
-    application.add_handler(CommandHandler("add", add_task))
-    # --- НОВЫЕ КОМАНДЫ ---
-    application.add_handler(CommandHandler("add_project", add_project_command))
-    application.add_handler(CommandHandler("delete_project", delete_project_command))
     
-    print("Бот запущен и подключен к базе данных...")
+    # Добавляем обработчики для удаления
+    application.add_handler(CommandHandler("deletetask", delete_task_start))
+    application.add_handler(CallbackQueryHandler(delete_task_confirm, pattern='^delete_task:.*'))
+
+    print("Бот запущен и готов к работе в интерактивном режиме...")
     application.run_polling()
 
 if __name__ == "__main__":
