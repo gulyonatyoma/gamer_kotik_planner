@@ -3,15 +3,12 @@
 import os
 import sys
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, func, inspect
-from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy import create_engine, func, inspect, Table
+from sqlalchemy.orm import sessionmaker, declarative_base, relationship
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, Date, ForeignKey, Numeric
-from sqlalchemy.orm import relationship
 
-# Загружаем переменные окружения из .env файла
 load_dotenv()
 
-# --- 1. Настройка подключения ---
 DB_PASSWORD = os.environ.get('DB_PASSWORD')
 DB_URI = f"postgresql://planner_user:{DB_PASSWORD}@localhost:5432/planner_db"
 
@@ -19,8 +16,17 @@ engine = create_engine(DB_URI)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
+# --- НОВИНКА: Создаем связующую таблицу для Task <-> Tag ---
+task_tags = Table('task_tags', Base.metadata,
+    Column('task_id', Integer, ForeignKey('tasks.id'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True)
+)
 
-# --- 2. Модели (без изменений) ---
+# --- НОВИНКА: Создаем модель для Тега ---
+class Tag(Base):
+    __tablename__ = 'tags'
+    id = Column(Integer, primary_key=True)
+    name = Column(String(100), unique=True, nullable=False)
 
 class Project(Base):
     __tablename__ = 'projects'
@@ -40,6 +46,9 @@ class Task(Base):
     priority = Column(String(50), default='low')
     deadline = Column(Date, nullable=True)
     project_id = Column(Integer, ForeignKey('projects.id', ondelete='SET NULL'), nullable=True)
+    
+    # --- НОВИНКА: Добавляем связь "многие ко многим" с Тегами ---
+    tags = relationship('Tag', secondary=task_tags, backref='tasks', lazy='joined')
 
 class ActivityLog(Base):
     __tablename__ = 'activity_log'
@@ -49,25 +58,17 @@ class ActivityLog(Base):
     activity_date = Column(Date, nullable=False)
     project_id = Column(Integer, ForeignKey('projects.id', ondelete='SET NULL'), nullable=True)
 
-
-# --- НОВАЯ УМНАЯ ФУНКЦИЯ ИНИЦИАЛИЗАЦИИ ---
-
 def init_db():
-    """
-    Проверяет, существуют ли таблицы в базе данных.
-    Если нет - создает их.
-    """
     inspector = inspect(engine)
-    # Проверяем наличие одной из таблиц (этого достаточно)
     if not inspector.has_table("tasks"):
         print("База данных не найдена или пуста. Создаю таблицы...")
         Base.metadata.create_all(bind=engine)
         print("✅ Таблицы успешно созданы.")
     else:
-        print("✅ База данных уже настроена.")
+        # --- НОВИНКА: Если таблицы есть, нужно досоздать новые ---
+        Base.metadata.create_all(bind=engine)
+        print("✅ База данных уже настроена (или обновлена).")
 
-
-# Эта часть позволяет вызывать init_db из командной строки
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == 'init':
         init_db()
