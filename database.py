@@ -16,17 +16,9 @@ engine = create_engine(DB_URI)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
-# --- НОВИНКА: Создаем связующую таблицу для Task <-> Tag ---
-task_tags = Table('task_tags', Base.metadata,
-    Column('task_id', Integer, ForeignKey('tasks.id'), primary_key=True),
-    Column('tag_id', Integer, ForeignKey('tags.id'), primary_key=True)
-)
-
-# --- НОВИНКА: Создаем модель для Тега ---
-class Tag(Base):
-    __tablename__ = 'tags'
-    id = Column(Integer, primary_key=True)
-    name = Column(String(100), unique=True, nullable=False)
+# --- ВАЖНО: Мы удаляем эти таблицы, чтобы вернуться к версии без тегов ---
+# task_tags = Table(...)
+# class Tag(Base): ...
 
 class Project(Base):
     __tablename__ = 'projects'
@@ -47,8 +39,8 @@ class Task(Base):
     deadline = Column(Date, nullable=True)
     project_id = Column(Integer, ForeignKey('projects.id', ondelete='SET NULL'), nullable=True)
     
-    # --- НОВИНКА: Добавляем связь "многие ко многим" с Тегами ---
-    tags = relationship('Tag', secondary=task_tags, backref='tasks', lazy='joined')
+    # --- ВАЖНО: Мы удаляем связь с тегами ---
+    # tags = relationship(...)
 
 class ActivityLog(Base):
     __tablename__ = 'activity_log'
@@ -65,9 +57,7 @@ def init_db():
         Base.metadata.create_all(bind=engine)
         print("✅ Таблицы успешно созданы.")
     else:
-        # --- НОВИНКА: Если таблицы есть, нужно досоздать новые ---
-        Base.metadata.create_all(bind=engine)
-        print("✅ База данных уже настроена (или обновлена).")
+        print("✅ База данных уже настроена.")
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == 'init':

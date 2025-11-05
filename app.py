@@ -54,21 +54,17 @@ def projects_page():
         projects_data.append({'id': p.id, 'name': p.name, 'total': total, 'completed': completed, 'progress': progress})
     return render_template('projects.html', projects=projects_data, nav_data=get_nav_data())
 
-# --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
 @app.route('/project/<project_name>')
 def project_detail_page(project_name):
-    # Используем правильный и самый надежный способ получить объект или ошибку 404
     project = db.session.execute(select(Project).filter_by(name=project_name)).scalar_one()
-    
     project_tasks = db.session.execute(select(Task).filter_by(project_id=project.id, status='pending').order_by(Task.created_at)).scalars().all()
     return render_template('project_detail.html', project=project, tasks=project_tasks, today_date=date.today(), nav_data=get_nav_data())
 
 @app.route('/archive')
 def archive_page():
-    completed_tasks = db.session.execute(select(Task).order_by(Task.completed_at.desc()).filter_by(status='completed')).scalars().all()
+    completed_tasks = db.session.execute(select(Task).filter_by(status='completed').order_by(Task.completed_at.desc())).scalars().all()
     return render_template('archive.html', tasks=completed_tasks, nav_data=get_nav_data())
 
-# ... (остальной код файла app.py остается без изменений) ...
 @app.route('/calendar', defaults={'year': None, 'month': None})
 @app.route('/calendar/<int:year>/<int:month>')
 def calendar_page(year, month):
@@ -128,8 +124,8 @@ def analytics_page():
 @app.route('/add_task', methods=['POST'])
 def add_task():
     title = request.form.get('title', '').strip()
-    deadline_str = request.form.get('deadline')
     if not title: return redirect(url_for('index'))
+    deadline_str = request.form.get('deadline')
     deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
     new_task = Task(title=title, deadline=deadline, project_id=None, is_today=True)
     db.session.add(new_task)
@@ -148,16 +144,12 @@ def add_project():
         db.session.commit()
     return redirect(url_for('projects_page'))
 
-# --- ИСПРАВЛЕНИЕ ЗДЕСЬ ---
 @app.route('/add_task_to_project/<project_name>', methods=['POST'])
 def add_task_to_project(project_name):
     title = request.form.get('title', '').strip()
-    deadline_str = request.form.get('deadline')
     if not title: return redirect(url_for('project_detail_page', project_name=project_name))
-    
-    # Используем правильный синтаксис
     project = db.session.execute(select(Project).filter_by(name=project_name)).scalar_one()
-    
+    deadline_str = request.form.get('deadline')
     deadline = datetime.strptime(deadline_str, '%Y-%m-%d').date() if deadline_str else None
     new_task = Task(title=title, deadline=deadline, project_id=project.id)
     db.session.add(new_task)
